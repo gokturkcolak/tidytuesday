@@ -1,0 +1,162 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-09-11"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warnings = FALSE, message = FALSE)
+theme_set(theme_light())
+```
+
+Primary Questions:
+
+What drives rating performance across different player segments?
+How does chess talent distribution vary globally and demographically?
+Can we identify patterns in player development and career trajectories?
+What factors predict high-performance outliers?
+
+Secondary Investigations:
+
+Rating inflation/deflation trends over time
+Federation-level competitive strength analysis
+Gender participation and performance gaps
+Title progression pathways and bottlenecks
+Age-related performance curves
+
+
+
+
+```{r}
+fide_ratings_august <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_august.csv')
+fide_ratings_september <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_september.csv')
+
+library(tidyverse)
+
+fide_ratings_august %>% 
+  mutate(month = "August")
+
+fide_ratings_september %>% 
+  mutate(month = "September")
+
+
+combined <- bind_rows(fide_ratings_august, fide_ratings_september)
+
+head(combined)
+
+
+combined %>%
+  group_by(sex) %>%
+  summarise(avg_rating = mean(rating, na.rm = TRUE))
+
+
+combined %>%
+  group_by(title) %>%
+  summarise(avg_rating = mean(rating, na.rm = TRUE)) %>%
+  arrange(desc(avg_rating))
+
+
+fide_ratings_august_clean <- fide_ratings_august %>%
+  distinct(id, .keep_all = TRUE)
+
+fide_ratings_september_clean <- fide_ratings_september %>%
+  distinct(id, .keep_all = TRUE)
+
+# Rating change from August to September
+fide_ratings_august_clean %>%
+  inner_join(fide_ratings_september_clean, by = "id", suffix = c("_aug", "_sept")) %>%
+  mutate(rating_change = rating_sept - rating_aug) %>%
+  group_by(title_aug) %>%
+  summarise(
+    avg_change = mean(rating_change, na.rm = TRUE),
+    total_players = n()
+  ) %>%
+  arrange(desc(avg_change))
+
+
+
+combined %>%
+  group_by(fed) %>%
+  summarise(
+    avg_rating = mean(rating, na.rm = TRUE),
+    total_players = n()
+  ) %>%
+  filter(total_players >= 500) %>%
+  arrange(desc(avg_rating))
+
+
+combined %>%
+  group_by(sex) %>%
+  summarise(
+    avg_rating = mean(rating, na.rm = TRUE),
+    total_players = n()
+  )
+```
+
+Seems like the relationship between age and ratings are relevant:
+
+```{r}
+current_year <- as.numeric(format(Sys.Date(), "%Y"))
+
+
+combined %>%
+  filter(!is.na(bday)) %>%
+  mutate(age = current_year - bday) %>%
+  group_by(age) %>%
+  summarise(
+    avg_rating = mean(rating, na.rm = TRUE),
+    total_players = n()
+  ) %>%
+  filter(total_players >= 100) %>%
+  arrange(age)
+```
+
+Can we identify patterns in player development and career trajectories?
+  calculate the rating change for each player and visualize
+
+```{r}
+fide_ratings_august_clean <- fide_ratings_august %>%
+  distinct(id, .keep_all = TRUE)
+
+fide_ratings_september_clean <- fide_ratings_september %>%
+  distinct(id, .keep_all = TRUE)
+
+combined_ratings <- fide_ratings_august_clean %>%http://127.0.0.1:37237/graphics/plot_zoom_png?width=1184&height=861
+  inner_join(fide_ratings_september_clean, by = "id", suffix = c("_aug", "_sept")) %>%
+  mutate(
+    rating_change = rating_sept - rating_aug,
+    rating_bin = cut(rating_aug,
+                     breaks = seq(0, 3000, by = 200),
+                     labels = paste0(seq(0, 2800, by = 200), "-", seq(200, 3000, by = 200)),
+                     right = FALSE)
+  )
+
+
+
+combined_ratings %>%
+  group_by(rating_bin) %>%
+  summarise(
+    avg_change = mean(rating_change, na.rm = TRUE),
+    total_players = n()
+  ) %>%
+  filter(!is.na(rating_bin)) %>%
+  ggplot(aes(x = rating_bin, y = avg_change)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Average Rating Change by Player Rating Bin",
+    x = "August Rating Bin",
+    y = "Average Rating Change (Aug to Sep)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Modelling
+
+```{r}
+model <- lm(rating_change ~ rating_aug + sex_aug + title_aug + k_aug, data = combined_ratings)
+
+summary(model)
+```
+
