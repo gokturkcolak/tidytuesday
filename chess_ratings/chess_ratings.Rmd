@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "FIDE Chess Player Ratings"
 output: html_document
 date: "2025-09-11"
 editor_options: 
@@ -12,26 +12,21 @@ theme_set(theme_light())
 ```
 
 Primary Questions:
-
-What drives rating performance across different player segments?
-How does chess talent distribution vary globally and demographically?
-Can we identify patterns in player development and career trajectories?
-What factors predict high-performance outliers?
+- What drives rating performance across different player segments?
+- How does chess talent distribution vary globally and demographically?
+- Can we identify patterns in player development and career trajectories?
+- What factors predict high-performance outliers?
 
 Secondary Investigations:
-
-Rating inflation/deflation trends over time
-Federation-level competitive strength analysis
-Gender participation and performance gaps
-Title progression pathways and bottlenecks
-Age-related performance curves
-
-
+- Rating inflation/deflation trends over time
+- Federation-level competitive strength analysis
+- Gender participation and performance gaps
+- Title progression pathways and bottlenecks
+- Age-related performance curve
 
 
 ```{r}
 library(tidyverse)
-library(ggthemes)
 
 august_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_august.csv') %>%
   distinct(id, .keep_all = TRUE) %>%
@@ -41,15 +36,14 @@ september_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordata
   distinct(id, .keep_all = TRUE) %>%
   mutate(month = "September")
 
-
 test_data <- september_ratings %>% 
   select(!rating)
 
-head(test_data)
 head(august_ratings)
+head(test_data)
 ```
 
-
+Performances regarding the sex, title, and federation of the players (simply "player segmentation")
 
 ```{r}
 august_ratings %>%
@@ -90,12 +84,9 @@ august_ratings %>%
   arrange(age)
 ```
 
-
+Age-related performance curve
 
 ```{r}
-pred
-
-
 august_ratings %>%
   filter(!is.na(bday)) %>%
   mutate(age = current_year - bday) %>%
@@ -113,11 +104,9 @@ august_ratings %>%
     x = "Age (Years)",
     y = "Average Rating"
   )
-
-summary(august_ratings)
 ```
 
-
+Prediction and Visualizations regarding our model
 
 ```{r}
 model <- lm(rating ~ sex + title + k, data = august_ratings)
