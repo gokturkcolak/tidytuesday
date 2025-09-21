@@ -106,7 +106,7 @@ august_ratings %>%
   )
 ```
 
-Prediction and Visualizations regarding our model
+Prediction and Visualizations regarding our model's result
 
 ```{r}
 model <- lm(rating ~ sex + title + k, data = august_ratings)
