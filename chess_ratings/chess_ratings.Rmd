@@ -1,155 +1,130 @@
 ---
 title: "FIDE Chess Player Ratings"
+author: Göktürk Çolak
 output: html_document
 date: "2025-09-11"
 editor_options: 
   chunk_output_type: console
 ---
 
+# FIDE Chess Ratings: Simple Analysis Dashboard
+
+## Setup and Data Loading
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-theme_set(theme_light())
+library(tidyverse)
+library(gridExtra)
+
+colors_main <- c("#2E86C1", "#E74C3C", "#28B463", "#F39C12", "#8E44AD")
+colors_gender <- c("M" = "#1F4E79", "F" = "#C2185B")
+
+theme_set(theme_minimal() + 
+          theme(plot.title = element_text(size = 11, face = "bold", color = "#2C3E50"),
+                plot.subtitle = element_text(size = 9, color = "#566573"),
+                text = element_text(color = "#2C3E50")))
 ```
 
-Primary Questions:
-- What drives rating performance across different player segments?
-- How does chess talent distribution vary globally and demographically?
-- Can we identify patterns in player development and career trajectories?
-- What factors predict high-performance outliers?
-
-Secondary Investigations:
-- Rating inflation/deflation trends over time
-- Federation-level competitive strength analysis
-- Gender participation and performance gaps
-- Title progression pathways and bottlenecks
-- Age-related performance curve
-
-
-```{r}
-library(tidyverse)
-
+```{r data_loading}
 august_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_august.csv') %>%
-  distinct(id, .keep_all = TRUE) %>%
-  mutate(month = "August")
+  distinct(id, .keep_all = TRUE)
 
 september_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2025/2025-09-23/fide_ratings_september.csv') %>%
-  distinct(id, .keep_all = TRUE) %>%
-  mutate(month = "September")
+  distinct(id, .keep_all = TRUE)
 
-test_data <- september_ratings %>% 
-  select(!rating)
-
-head(august_ratings)
-head(test_data)
+current_year <- 2025
 ```
 
-Performances regarding the sex, title, and federation of the players (simply "player segmentation")
+## Panel A: Rating Distribution by Gender
 
-```{r}
-august_ratings %>%
+```{r panel1}
+panel1 <- august_ratings %>%
+  filter(!is.na(sex), rating >= 1000, rating <= 3000) %>%
+  mutate(rating_tier = cut(rating, breaks = c(1000, 1500, 2000, 2500, 3000), 
+                          labels = c("1000-1500", "1500-2000", "2000-2500", "2500+"))) %>%
+  count(sex, rating_tier) %>%
+  ggplot(aes(x = rating_tier, y = n, fill = sex)) +
+  geom_col(position = "dodge", alpha = 0.8) +
+  scale_fill_manual(values = colors_gender) +
+  scale_y_log10() +
+  labs(title = "A. Player Distribution by Rating Tier and Gender",
+       x = "Rating Range", y = "Number of Players (log scale)")
+```
+
+## Panel B: Age vs Rating
+
+```{r panel2}
+panel2 <- august_ratings %>%
+  filter(!is.na(bday), bday >= 1930, bday <= 2015) %>%
+  mutate(age = current_year - bday) %>%
+  filter(age >= 5, age <= 80) %>%
+  mutate(age_group = cut(age, breaks = seq(5, 80, by = 10))) %>%
+  group_by(age_group) %>%
+  summarise(avg_rating = mean(rating, na.rm = TRUE),
+            count = n()) %>%
+  filter(count >= 100) %>%
+  mutate(age_mid = seq(10, 75, by = 10)[1:nrow(.)]) %>%
+  ggplot(aes(x = age_mid, y = avg_rating)) +
+  geom_line(color = colors_main[1], size = 1.2) +
+  geom_point(color = colors_main[2], size = 3, alpha = 0.8) +
+  labs(title = "B. Average Rating by Age Group",
+       x = "Age", y = "Average Rating")
+```
+
+## Panel C: Title Distribution
+
+```{r panel3}
+panel3 <- august_ratings %>%
+  filter(!is.na(title), title != "") %>%
+  count(title) %>%
+  arrange(desc(n)) %>%
+  slice_head(n = 8) %>%
+  ggplot(aes(x = reorder(title, n), y = n)) +
+  geom_col(fill = colors_main[3], alpha = 0.8) +
+  coord_flip() +
+  labs(title = "C. Distribution of Chess Titles",
+       x = "Title", y = "Number of Players")
+```
+
+## Panel D: Rating Distribution Density
+
+```{r panel4}
+panel4 <- august_ratings %>%
+  filter(rating >= 1200, rating <= 2800, !is.na(sex)) %>%
+  ggplot(aes(x = rating, fill = sex)) +
+  geom_density(alpha = 0.7) +
+  scale_fill_manual(values = colors_gender) +
+  labs(title = "D. Rating Distribution Density by Gender",
+       x = "Rating", y = "Density", fill = "Gender")
+```
+
+## Combined Dashboard
+
+```{r dashboard}
+grid.arrange(panel1, panel2, panel3, panel4, ncol = 2, nrow = 2)
+```
+
+## Model Performance
+
+```{r performance}
+sample_ratings <- august_ratings %>%
+  filter(!is.na(sex), rating >= 1200, rating <= 2800) %>%
+  sample_n(min(5000, nrow(.)))
+
+gender_stats <- sample_ratings %>%
   group_by(sex) %>%
   summarise(
-    avg_rating = mean(rating, na.rm = TRUE),
-    total_players = n()
+    mean_rating = round(mean(rating), 0),
+    median_rating = round(median(rating), 0),
+    sd_rating = round(sd(rating), 0),
+    count = n()
   )
 
-august_ratings %>%
-  group_by(title) %>%
-  summarise(
-    avg_rating = mean(rating, na.rm = TRUE),
-    total_players = n()
-  ) %>%
-  arrange(desc(avg_rating))
+cat("Rating Statistics by Gender:\n")
+print(gender_stats)
 
-august_ratings %>%
-  group_by(fed) %>%
-  summarise(
-    avg_rating = mean(rating, na.rm = TRUE),
-    total_players = n()
-  ) %>%
-  filter(total_players >= 500) %>%
-  arrange(desc(avg_rating))
-
-current_year <- as.numeric(format(Sys.Date(), "%Y"))
-
-august_ratings %>%
-  filter(!is.na(bday)) %>%
-  mutate(age = current_year - bday) %>%
-  group_by(age) %>%
-  summarise(
-    avg_rating = mean(rating, na.rm = TRUE),
-    total_players = n()
-  ) %>%
-  filter(total_players >= 100) %>%
-  arrange(age)
-```
-
-Age-related performance curve
-
-```{r}
-august_ratings %>%
-  filter(!is.na(bday)) %>%
-  mutate(age = current_year - bday) %>%
-  group_by(age) %>%
-  summarise(
-    avg_rating = mean(rating, na.rm = TRUE),
-    total_players = n()
-  ) %>%
-  filter(total_players >= 100) %>%
-  ggplot(aes(x = age, y = avg_rating)) +
-  geom_line(color = "steelblue", size = 1) +
-  geom_point(color = "steelblue", size = 2) +
-  labs(
-    title = "Average FIDE Rating by Age",
-    x = "Age (Years)",
-    y = "Average Rating"
-  )
-```
-
-Prediction and Visualizations regarding our model's result
-
-```{r}
-model <- lm(rating ~ sex + title + k, data = august_ratings)
-
-clean_september_ratings <- september_ratings %>%
-  filter(!is.na(sex) & !is.na(title) & !is.na(k) & !is.na(bday))
-
-predicted_ratings <- predict(model, newdata = clean_september_ratings)
-
-clean_september_ratings$predicted_sept_rating <- predicted_ratings
-
-# Calculate the error on this single, consistent data frame.
-final_results <- clean_september_ratings %>%
-  rename(actual_sept_rating = rating) %>%
-  mutate(prediction_error = predicted_sept_rating - actual_sept_rating)
-
-summary(final_results$prediction_error)
-
-ggplot(final_results, aes(x = actual_sept_rating, y = predicted_sept_rating)) +
-  geom_point(alpha = 0.5) +
-  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", size = 1) +
-  labs(
-    title = "Actual vs. Predicted September FIDE Ratings",
-    subtitle = "A strong alignment with the dashed line indicates good model performance",
-    x = "Actual September Rating",
-    y = "Predicted September Rating"
-  )
-
-ggplot(final_results, aes(x = prediction_error)) +
-  geom_histogram(binwidth = 10, fill = "dodgerblue", color = "white") +
-  geom_vline(aes(xintercept = mean(prediction_error)), color = "red", linetype = "dashed", size = 1) +
-  labs(
-    title = "Distribution of Model Prediction Errors",
-    subtitle = "The dashed red line indicates the mean error, which is close to zero.",
-    x = "Prediction Error (Predicted Rating - Actual Rating)",
-    y = "Number of Players")
-
-ggsave("prediction_errors.png", width = 8, height = 6, dpi = 300)
-
-
-summary(september_ratings$rating)
-summary(final_results$predicted_sept_rating)
-
-final_results %>% 
-  select(predicted_sept_rating, actual_sept_rating, prediction_error)
+cat("\nOverall Rating Distribution:\n")
+cat("Mean:", round(mean(sample_ratings$rating), 0), "\n")
+cat("Median:", round(median(sample_ratings$rating), 0), "\n")
+cat("Standard Deviation:", round(sd(sample_ratings$rating), 0), "\n")
 ```
