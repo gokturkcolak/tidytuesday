@@ -7,13 +7,14 @@ editor_options:
   chunk_output_type: console
 ---
 
-# FIDE Chess Ratings: Simple Analysis Dashboard
+# FIDE Chess Player Ratings: Analysis Dashboard
 
 ## Setup and Data Loading
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
+library(scales)
 
 colors_main <- c("#2E86C1", "#E74C3C", "#28B463", "#F39C12", "#8E44AD")
 colors_gender <- c("M" = "#1F4E79", "F" = "#C2185B")
@@ -45,9 +46,10 @@ panel1 <- august_ratings %>%
   ggplot(aes(x = rating_tier, y = n, fill = sex)) +
   geom_col(position = "dodge", alpha = 0.8) +
   scale_fill_manual(values = colors_gender) +
-  scale_y_log10() +
+  scale_y_log10(labels = comma) +
   labs(title = "Player Distribution by Rating Tier and Gender",
-       x = "Rating Range", y = "Number of Players (log scale)")
+       x = "Rating Range", y = "Number of Players (log scale)",
+       fill = "Gender")
 ```
 
 ## Panel B: Age vs Rating
@@ -105,24 +107,24 @@ library(ggtext)
 
 combined_dashboard <- (panel1 + panel2) / (panel3 + panel4) +
   plot_annotation(
-    title = 'FIDE Chess Ratings Dashboard',
+    title = 'FIDE Chess Player Ratings Dashboard',
     subtitle = 'Analysis of Player Distributions by Rating, Age, Gender, and Title',
-    caption = "TidyTuesday | Week 48<br>
+    caption = "TidyTuesday | Week 38<br>
                   <img src='linkedin.png' width='12' height='12'/> gokturkcolak &nbsp;
-                  <img src='github.png' width='12' height='12'/> gokturkcolak"
-  ) &
-  theme(
-    plot.title = element_text(size = 20, face = "bold", hjust = 0),
-    plot.subtitle = element_text(size = 14, hjust = 0),
-    plot.caption = element_markdown(hjust = 0.5, size = 10, lineheight = 1.2, margin = margin(t = 10))
+                  <img src='github.png' width='12' height='12'/> gokturkcolak",
+    
+    theme = theme(
+      plot.title = element_text(size = 20, face = "bold", hjust = 0),
+      plot.subtitle = element_text(size = 14, hjust = 0, margin = margin(b = 20)),
+      plot.caption = element_markdown(hjust = 0.5, size = 10, lineheight = 1.2, margin = margin(t = 15))
+    )
   )
 
-# Show the plot in the Rmd output
+
+# Plot'u göster
 combined_dashboard
 
-# setwd("socials") # Ensure the "socials" directory exists relative to your Rmd file.
-
-ggsave("2css_ratings_dashboard.png", # Changed the filename to be more descriptive
+ggsave("2025_38.png",
        plot = combined_dashboard,
        width = 12,
        height = 9,
