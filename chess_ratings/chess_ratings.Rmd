@@ -14,7 +14,6 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 library(tidyverse)
-library(gridExtra)
 
 colors_main <- c("#2E86C1", "#E74C3C", "#28B463", "#F39C12", "#8E44AD")
 colors_gender <- c("M" = "#1F4E79", "F" = "#C2185B")
@@ -47,7 +46,7 @@ panel1 <- august_ratings %>%
   geom_col(position = "dodge", alpha = 0.8) +
   scale_fill_manual(values = colors_gender) +
   scale_y_log10() +
-  labs(title = "A. Player Distribution by Rating Tier and Gender",
+  labs(title = "Player Distribution by Rating Tier and Gender",
        x = "Rating Range", y = "Number of Players (log scale)")
 ```
 
@@ -67,7 +66,7 @@ panel2 <- august_ratings %>%
   ggplot(aes(x = age_mid, y = avg_rating)) +
   geom_line(color = colors_main[1], size = 1.2) +
   geom_point(color = colors_main[2], size = 3, alpha = 0.8) +
-  labs(title = "B. Average Rating by Age Group",
+  labs(title = "Average Rating by Age Group",
        x = "Age", y = "Average Rating")
 ```
 
@@ -82,7 +81,7 @@ panel3 <- august_ratings %>%
   ggplot(aes(x = reorder(title, n), y = n)) +
   geom_col(fill = colors_main[3], alpha = 0.8) +
   coord_flip() +
-  labs(title = "C. Distribution of Chess Titles",
+  labs(title = "Distribution of Chess Titles",
        x = "Title", y = "Number of Players")
 ```
 
@@ -94,14 +93,40 @@ panel4 <- august_ratings %>%
   ggplot(aes(x = rating, fill = sex)) +
   geom_density(alpha = 0.7) +
   scale_fill_manual(values = colors_gender) +
-  labs(title = "D. Rating Distribution Density by Gender",
+  labs(title = "Rating Distribution Density by Gender",
        x = "Rating", y = "Density", fill = "Gender")
 ```
 
 ## Combined Dashboard
 
 ```{r dashboard}
-grid.arrange(panel1, panel2, panel3, panel4, ncol = 2, nrow = 2)
+library(patchwork)
+library(ggtext)
+
+combined_dashboard <- (panel1 + panel2) / (panel3 + panel4) +
+  plot_annotation(
+    title = 'FIDE Chess Ratings Dashboard',
+    subtitle = 'Analysis of Player Distributions by Rating, Age, Gender, and Title',
+    caption = "TidyTuesday | Week 48<br>
+                  <img src='linkedin.png' width='12' height='12'/> gokturkcolak &nbsp;
+                  <img src='github.png' width='12' height='12'/> gokturkcolak"
+  ) &
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0),
+    plot.subtitle = element_text(size = 14, hjust = 0),
+    plot.caption = element_markdown(hjust = 0.5, size = 10, lineheight = 1.2, margin = margin(t = 10))
+  )
+
+# Show the plot in the Rmd output
+combined_dashboard
+
+# setwd("socials") # Ensure the "socials" directory exists relative to your Rmd file.
+
+ggsave("2css_ratings_dashboard.png", # Changed the filename to be more descriptive
+       plot = combined_dashboard,
+       width = 12,
+       height = 9,
+       dpi = 300)
 ```
 
 ## Model Performance
