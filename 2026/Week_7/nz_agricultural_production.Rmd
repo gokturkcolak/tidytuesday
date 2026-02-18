@@ -1,0 +1,205 @@
+---
+title: "Agricultural Production Statistics in New Zealand"
+author: "Göktürk Çolak"
+date: "2026-02-16"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(stringr)
+library(scales)
+
+theme_set(theme_light(base_size = 28))
+
+dataset_raw <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-17/dataset.csv')
+```
+
+```{r}
+head(dataset_raw)
+```
+
+```{r}
+dataset_tidy <- dataset_raw %>%
+  pivot_wider(names_from = measure, values_from = value) %>%
+  clean_names()
+
+length(colnames(dataset_tidy))
+
+colnames(dataset_tidy)
+```
+
+```{r}
+cattle_trends <- dataset_tidy %>%
+  mutate(across(everything(), ~as.numeric(as.character(.)))) %>%
+  select(
+    year_ended_june, 
+    `Beef (Total)` = total_beef_cattle, 
+    `Dairy (Total)` = total_dairy_cattle_including_bobby_calves
+  ) %>%
+  filter(!is.na(year_ended_june)) %>%
+  pivot_longer(cols = -year_ended_june, names_to = "Cattle_Type", values_to = "Count") %>%
+  filter(!is.na(Count))
+
+# Clean Plot
+p_cattle <- cattle_trends %>% 
+  ggplot(aes(x = year_ended_june, y = Count, color = Cattle_Type, group = Cattle_Type)) +
+  geom_line(size = 1.1) +
+  scale_y_continuous(labels = scales::label_number(scale_cut = scales::cut_short_scale())) +
+  scale_color_manual(values = c("Beef (Total)" = "#8B4513", "Dairy (Total)" = "#0072B2")) +
+  labs(
+    title = "New Zealand Cattle Industry",
+    subtitle = "Dairy population overtaking Beef as a primary economic driver",
+    x = "Year",
+    y = "Total Head of Cattle",
+    color = "Industry Sector"
+  ) +
+  theme(legend.position = "top")
+```
+
+```{r}
+# Data preparation for plot 1
+efficiency_data <- dataset_raw %>%
+  filter(grepl("wheat", measure, ignore.case = TRUE)) %>%
+  mutate(measure_clean = case_when(
+    grepl("area", measure, ignore.case = TRUE) ~ "area",
+    grepl("yield|production", measure, ignore.case = TRUE) ~ "yield"
+  )) %>%
+  select(year_ended_june, measure_clean, value) %>%
+  mutate(value = as.numeric(as.character(value))) %>%
+  # Pivot to put area and yield side-by-side
+  pivot_wider(names_from = measure_clean, values_from = value, values_fn = sum) %>%
+  # Calculate Ratio
+  filter(!is.na(area), !is.na(yield), area > 0) %>%
+  mutate(yield_per_hectare = yield / area)
+
+# Plot 1
+p_wheat <- efficiency_data %>% 
+  ggplot(aes(x = year_ended_june, y = yield_per_hectare)) +
+  geom_line(aes(group = 1), color = "darkgoldenrod", linewidth = 1) + 
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Wheat Efficiency: Yield per Hectare (1935-2024)",
+    subtitle = "Higher values indicate more tonnes produced per hectare sown",
+    x = "Year",
+    y = "Tonnes per Hectare"
+  )
+```
+
+# 
+
+```{r}
+library(viridis)
+
+# Filtering 2024 data
+land_use_2024 <- dataset_raw %>%
+  filter(
+    value_label == "Hectares", 
+    year_ended_june == max(year_ended_june, na.rm = TRUE),
+    !measure == "Total Area of Farms" 
+  ) %>%
+  mutate(value = as.numeric(value))
+
+# Aggregating the categories
+land_use_aggregated <- land_use_2024 %>%
+  mutate(category = case_when(
+    grepl("Grass|Pasture|Tussock|Lucerne", measure, ignore.case = TRUE) ~ "Pasture & Grassland",
+    grepl("Wheat|Barley|Oats|Maize|Grain", measure, ignore.case = TRUE) ~ "Grains & Arable Crops",
+    grepl("Exotic Trees|Forest", measure, ignore.case = TRUE) ~ "Forestry & Plantations",
+    grepl("Fruit|Vegetable|Orchard|Vineyard|Wine|Berry|Citrus|Nut", measure, ignore.case = TRUE) ~ "Horticulture",
+    TRUE ~ "Other Agricultural Land"
+  )) %>%
+  group_by(category) %>%
+  summarise(total_value = sum(value, na.rm = TRUE)) %>%
+  ungroup()
+
+# Color palette
+nz_palette <- c(
+  "Pasture & Grassland"     = "#228B22",
+  "Forestry & Plantations"  = "#2F4F4F",
+  "Horticulture"            = "#FF8C00",
+  "Grains & Arable Crops"   = "#B8860B",
+  "Other Agricultural Land" = "#808080"
+)
+
+# Plot 3
+p_land <- land_use_aggregated %>% 
+  ggplot(aes(x = reorder(category, total_value), y = total_value, fill = category)) +
+  geom_col() +
+  # Add numeric labels to the end of bars
+  geom_text(
+    aes(label = comma(total_value)), 
+    hjust = -0.1, 
+    size = 6, 
+    fontface = "bold",
+    color = "grey20"
+  ) +
+  coord_flip() +
+  scale_fill_manual(values = nz_palette) +
+  # Expand axis so text labels don't get cut off
+  scale_y_continuous(
+    labels = comma, 
+    expand = expansion(mult = c(0, 0.2)) 
+  ) +
+  labs(
+    title = "New Zealand Land Use: Aggregated Sectors",
+    subtitle = "Dominance of pastoral lands in the New Zealand agricultural landscape",
+    x = NULL,
+    y = "Total Hectares"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank() # Cleans up horizontal lines for bar charts
+  )
+```
+
+```{r}
+library(patchwork)
+library(ggbranding)
+
+# 1. Ensemble the plots
+combined_plot <- p_cattle / p_wheat
+
+# 2. Branding
+final_branded_plot <- wrap_elements(combined_plot) +
+  add_branding(
+    github           = "gokturkcolak",
+    linkedin         = "gokturkcolak",
+    additional_text  = "Data: Stats NZ | #TidyTuesday 2026 Week 7",
+    text_position    = "before",
+    line_spacing     = 1L,
+    caption_halign   = 1,
+    icon_color       = "#228B22",
+    text_color       = "#2F4F4F",
+    icon_size = "32pt",
+    text_size = "31pt",  
+    caption_margin   = margin(t = 10, b = 5, unit = "pt") 
+  )
+
+# 3. View
+final_branded_plot
+
+# Cattle Industry & Wheat Efficiency
+ggsave(
+  filename = "nz_agricultural_production.png", 
+  plot     = final_branded_plot,
+  width    = 12, 
+  height   = 9, 
+  dpi      = 300,
+  bg       = "white",
+)
+
+```
+
+
+
+
