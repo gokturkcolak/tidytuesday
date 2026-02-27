@@ -11,6 +11,12 @@ editor_options:
 library(tidyverse)
 library(scales)
 library(ggbranding)
+library(showtext)
+
+# Download and register the font
+font_add_google("Commissioner", "Commissioner")
+showtext_auto()
+
 
 set_theme(theme_light())
 
@@ -159,34 +165,33 @@ cumulative_data_area <- sfi_grants %>%
 # Plot
 
 ```{r}
-p <- cumulative_data_area %>% 
-  ggplot(aes(month_year,cumulative_funding, fill = prog_lumped)) +
+p <- ggplot(cumulative_data_area, aes(x = month_year, y = cumulative_funding, fill = prog_lumped)) +
   geom_area(alpha = 0.8, color = "white", linewidth = 0.2) +
-  scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-6, suffix = "M")) +
+  scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-9, suffix = "B")) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
-  scale_fill_viridis_d(option = "plasma", end = 0.9) +
+  scale_fill_viridis_d(option = "plasma", end = 0.9, na.translate = FALSE) +
   labs(
     title = "What is the market dominance of the Top 5 programs compared to the long tail of smaller programs (Other)?",
-    subtitle = "Visualizing the long-tail fragmentation of capital allocation across all programmes",
     x = "Date",
-    y = "Total Cumulative Commitment (Millions)",
+    y = "Total Cumulative Commitment (Billions)",
     fill = "Programme"
   ) +
   theme(
-    # Angle the dates to 45 degrees so they do not overlap
+    # Apply the Commissioner font and angle the dates
+    text = element_text(family = "Commissioner"),
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
   add_branding(
-    # Update these with your actual handles!
     github = "gokturkcolak", 
     linkedin = "gokturkcolak"
   )
+
+p
 ```
 
 ```{r}
-# Save the plot with LinkedIn-optimized dimensions
 ggsave(
-  filename = "sfi_market_dominance_stacked_area.png", 
+  filename = "sfi_market_dominance.png", 
   plot = p,
   width = 7, 
   height = 4,
