@@ -1,0 +1,198 @@
+---
+title: "Science Foundation Ireland Grants Commitments"
+author: "Göktürk Çolak"
+date: "2026-02-24"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(scales)
+library(ggbranding)
+
+set_theme(theme_light())
+
+
+sfi_grants <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-24/sfi_grants.csv')
+```
+
+# A quick glance at the data
+
+```{r}
+glimpse(sfi_grants)
+
+unique(sfi_grants$funder_name)
+
+sfi_grants %>%
+  View()
+```
+
+
+
+## How are the grant commitments distributed?
+
+```{r}
+sfi_grants %>% 
+  ggplot(aes(x = current_total_commitment)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 50, fill = "dodgerblue", color = "white", alpha = 0.8) +
+  geom_density(color = "black", lwd = 1, adjust = 1) + 
+  scale_x_log10(labels = scales::label_number(scale_cut = cut_short_scale()),
+                breaks = trans_breaks("log10", function(x) 10^x)) +
+  labs(
+    title = "Distribution of Grant Commitments (Log Scale)",
+    subtitle = "Histogram + Density Curve to reveal data structure",
+    x = "Commitment Amount (€)",
+    y = "Density"
+  )
+```
+
+
+## Which research bodies got the most commitments?
+
+```{r}
+sfi_grants %>%
+  group_by(research_body) %>%
+  summarise(total_funding = sum(current_total_commitment)) %>%
+  slice_max(total_funding, n = 10) %>%
+  mutate(research_body = fct_reorder(research_body, total_funding)) %>%
+  ggplot(aes(total_funding, research_body)) +
+  geom_col(fill = "#2c3e50", width = 0.7) +
+  scale_x_continuous(labels = scales::label_currency(prefix = "€", scale_cut = cut_short_scale())) +
+  labs(
+    title = "Top 10 Research Bodies by Total Grant Commitments",
+    subtitle = "Aggregated sum of all commitments",
+    x = "Total Funding Received (€)",
+    y = NULL
+    ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold")
+    )
+```
+
+## Which programs got the most commitments?
+
+```{r}
+sfi_grants %>%
+  group_by(programme_name) %>%
+  summarise(total_funding = sum(current_total_commitment)) %>%
+  slice_max(total_funding, n = 10) %>%
+  mutate(programme_name = fct_reorder(programme_name, total_funding)) %>%
+  ggplot(aes(total_funding, programme_name)) +
+  geom_col(fill = "#2c3e50", width = 0.7) +
+  scale_x_continuous(labels = scales::label_currency(prefix = "€", scale_cut = cut_short_scale())) +
+  labs(
+    title = "Top 10 Research Bodies by Total Grant Commitments",
+    subtitle = "Aggregated sum of all commitments",
+    x = "Total Funding Received (€)",
+    y = NULL
+    ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    axis.text.y = element_text(size = 10, face = "bold"))
+```
+
+## How does the performance of the top 5 programs compare to 'Other' individually?
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(forcats)
+
+cumulative_data <- sfi_grants %>%
+  filter(!is.na(start_date), !is.na(current_total_commitment), current_total_commitment > 0) %>%
+  mutate(
+    month_year = floor_date(start_date, "month"),
+    prog_lumped = fct_lump_n(programme_name, n = 5, w = current_total_commitment)
+  ) %>%
+  group_by(prog_lumped, month_year) %>%
+  summarise(monthly_funding = sum(current_total_commitment), .groups = "drop") %>%
+  arrange(prog_lumped, month_year) %>%
+  group_by(prog_lumped) %>%
+  mutate(cumulative_funding = cumsum(monthly_funding)) %>%
+  ungroup()
+```
+
+
+```{r}
+library(ggplot2)
+library(scales)
+
+ggplot(cumulative_data, aes(x = month_year, y = cumulative_funding, color = prog_lumped)) +
+  geom_step(linewidth = 1.2, alpha = 0.8) +
+  scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-6, suffix = "M")) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  scale_color_viridis_d(option = "plasma", end = 0.9) +
+  labs(
+    title = "Cumulative Funding Trajectory: Top SFI Programmes",
+    subtitle = "Tracking the velocity and compounding growth of capital allocations over time",
+    x = "Date",
+    y = "Cumulative Commitment (Millions)",
+    color = "Programme"
+  )
+```
+
+## What is the market share (dominance) of the Top 5 programs compared to the long tail of smaller programs (Other)?
+
+```{r}
+cumulative_data_area <- sfi_grants %>%
+  filter(!is.na(start_date), !is.na(current_total_commitment), current_total_commitment > 0) %>%
+  mutate(
+    month_year = floor_date(start_date, "month"),
+    prog_lumped = fct_lump_n(programme_name, n = 5, w = current_total_commitment)
+  ) %>%
+  group_by(prog_lumped, month_year) %>%
+  summarise(monthly_funding = sum(current_total_commitment), .groups = "drop") %>%
+  complete(prog_lumped, month_year, fill = list(monthly_funding = 0)) %>%
+  arrange(prog_lumped, month_year) %>%
+  group_by(prog_lumped) %>%
+  mutate(cumulative_funding = cumsum(monthly_funding)) %>%
+  ungroup() %>%
+  # Forces "Other" to be the base of the stacked area chart
+  mutate(prog_lumped = fct_relevel(prog_lumped, "Other", after = Inf))
+```
+
+# Plot
+
+```{r}
+p <- cumulative_data_area %>% 
+  ggplot(aes(month_year,cumulative_funding, fill = prog_lumped)) +
+  geom_area(alpha = 0.8, color = "white", linewidth = 0.2) +
+  scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-6, suffix = "M")) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  scale_fill_viridis_d(option = "plasma", end = 0.9) +
+  labs(
+    title = "What is the market dominance of the Top 5 programs compared to the long tail of smaller programs (Other)?",
+    subtitle = "Visualizing the long-tail fragmentation of capital allocation across all programmes",
+    x = "Date",
+    y = "Total Cumulative Commitment (Millions)",
+    fill = "Programme"
+  ) +
+  theme(
+    # Angle the dates to 45 degrees so they do not overlap
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  add_branding(
+    # Update these with your actual handles!
+    github = "gokturkcolak", 
+    linkedin = "gokturkcolak"
+  )
+```
+
+```{r}
+# Save the plot with LinkedIn-optimized dimensions
+ggsave(
+  filename = "sfi_market_dominance_stacked_area.png", 
+  plot = p,
+  width = 7, 
+  height = 4,
+  units = "in",
+  dpi = 300,
+  bg = "white"
+)
+```
+
