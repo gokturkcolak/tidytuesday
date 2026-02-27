@@ -11,6 +11,7 @@ editor_options:
 library(tidyverse)
 library(scales)
 library(ggbranding)
+library(ggtext)
 library(showtext)
 
 # Download and register the font
@@ -105,10 +106,6 @@ sfi_grants %>%
 ## How does the performance of the top 5 programs compare to 'Other' individually?
 
 ```{r}
-library(dplyr)
-library(lubridate)
-library(forcats)
-
 cumulative_data <- sfi_grants %>%
   filter(!is.na(start_date), !is.na(current_total_commitment), current_total_commitment > 0) %>%
   mutate(
@@ -125,10 +122,9 @@ cumulative_data <- sfi_grants %>%
 
 
 ```{r}
-library(ggplot2)
-library(scales)
 
-ggplot(cumulative_data, aes(x = month_year, y = cumulative_funding, color = prog_lumped)) +
+cumulative_data %>% 
+  ggplot(aes(month_year, cumulative_funding, color = prog_lumped)) +
   geom_step(linewidth = 1.2, alpha = 0.8) +
   scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-6, suffix = "M")) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
@@ -165,7 +161,8 @@ cumulative_data_area <- sfi_grants %>%
 # Plot
 
 ```{r}
-p <- ggplot(cumulative_data_area, aes(x = month_year, y = cumulative_funding, fill = prog_lumped)) +
+p <- cumulative_data_area %>% 
+  ggplot(aes(month_year, cumulative_funding, fill = prog_lumped)) +
   geom_area(alpha = 0.8, color = "white", linewidth = 0.2) +
   scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-9, suffix = "B")) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
@@ -173,17 +170,26 @@ p <- ggplot(cumulative_data_area, aes(x = month_year, y = cumulative_funding, fi
   labs(
     title = "What is the market dominance of the Top 5 programs compared to the long tail of smaller programs (Other)?",
     x = "Date",
-    y = "Total Cumulative Commitment (Billions)",
+    y = "Total Cumulative Commitment", 
     fill = "Programme"
   ) +
-  theme(
-    # Apply the Commissioner font and angle the dates
-    text = element_text(family = "Commissioner"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  ) +
   add_branding(
-    github = "gokturkcolak", 
-    linkedin = "gokturkcolak"
+    github       = "gokturkcolak", 
+    linkedin     = "gokturkcolak",
+    custom_icons = c(rss = "gokturkcolak.github.io"),
+    icon_color   = "#0d0887",
+    text_color   = "#0d0887",
+    icon_size    = "14pt",
+    text_size    = "14pt"
+  ) +
+  theme(
+    text = element_text(family = "Commissioner"),
+    plot.title = element_text(size = 16, face = "bold", margin = margin(b = 10)),
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 12)
   )
 
 p
