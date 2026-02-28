@@ -161,8 +161,7 @@ cumulative_data_area <- sfi_grants %>%
 # Plot
 
 ```{r}
-p <- cumulative_data_area %>% 
-  ggplot(aes(month_year, cumulative_funding, fill = prog_lumped)) +
+p <- ggplot(cumulative_data_area, aes(x = month_year, y = cumulative_funding, fill = prog_lumped)) +
   geom_area(alpha = 0.8, color = "white", linewidth = 0.2) +
   scale_y_continuous(labels = label_dollar(prefix = "€", scale = 1e-9, suffix = "B")) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
@@ -177,20 +176,23 @@ p <- cumulative_data_area %>%
     github       = "gokturkcolak", 
     linkedin     = "gokturkcolak",
     custom_icons = c(rss = "gokturkcolak.github.io"),
-    icon_color   = "#0d0887",
-    text_color   = "#0d0887",
-    icon_size    = "14pt",
-    text_size    = "14pt"
+    icon_color   = "grey30",  
+    text_color   = "grey30",  
+    icon_size    = "16pt",
+    text_size    = "16pt"
   ) +
   theme(
     text = element_text(family = "Commissioner"),
-    plot.title = element_text(size = 16, face = "bold", margin = margin(b = 10)),
-    axis.title = element_text(size = 14),
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
-    axis.text.y = element_text(size = 12),
-    legend.title = element_text(size = 14),
-    legend.text = element_text(size = 12)
+    plot.title = element_text(size = 20, face = "bold", margin = margin(b = 12)), # Increased to 20
+    axis.title = element_text(size = 16), # Increased to 16
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 14), # Increased to 14
+    axis.text.y = element_text(size = 14), # Increased to 14
+    legend.title = element_text(size = 16), # Increased to 16
+    legend.text = element_text(size = 14), # Increased to 14
+    plot.caption = element_markdown(size = 15, color = "grey30", hjust = 0, margin = margin(t = 15)) # Increased to 15
   )
+
+p$labels$caption <- paste0("**Data**: Ireland's Open Data Portal - TidyTuesday 2026, Week 08 &nbsp;&bull;&nbsp; ", p$labels$caption)
 
 p
 ```
